@@ -1,0 +1,16 @@
+project:
+  name: transformers-project
+  seed: 42
+
+device:
+  type: cpu
+
+paths:
+  raw_data: data/raw
+  processed_data: data/processed
+  outputs: outputs
+
+training:
+  batch_size: 32
+  learning_rate: 0.001
+  epochs: 10
