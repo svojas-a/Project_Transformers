@@ -211,3 +211,12 @@ def compute_attention_entropy(
 
     _check_finite(row_entropy, "compute_attention_entropy", attn.shape[-1])
     return _reduce(row_entropy, reduction)
+
+
+
+def explained_variance_ratio(pca):
+    """
+    Returns the cumulative explained variance ratio
+    of a fitted PCA model.
+    """
+    return float(pca.explained_variance_ratio_.sum())
