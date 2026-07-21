@@ -64,17 +64,21 @@ from transformers import AutoTokenizer, DistilBertModel
 MODEL_NAME = "distilbert-base-uncased"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 N_LAYERS = 6
-SOURCE_LAYERS = [0, 3]
-TARGET_RANKS = [1, 8]
-N_SAMPLES_PER_TASK = 4        # keep modest; this is O(layers x ranks x tasks) forward passes
+SOURCE_LAYERS = [0, 1, 2, 3, 4, 5]
+TARGET_RANKS = [1, 2, 4, 8, 16, 32]
+N_SAMPLES_PER_TASK = 64       # keep modest; this is O(layers x ranks x tasks) forward passes
 MAX_LENGTH = 64
 OUTPUT_DIR = Path("results")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 TASKS = {
-    "sst2": dict(hf_name="nyu-mll/glue", hf_config="sst2", text_cols=["sentence"]),
-    "mnli": dict(hf_name="nyu-mll/glue", hf_config="mnli", text_cols=["premise", "hypothesis"]),
-    "conll2003": dict(hf_name="BramVanroy/conll2003", hf_config=None, text_cols=["tokens"]),
+    "sst2": dict(hf_name="nyu-mll/glue", hf_config="sst2", text_cols=["sentence"], split="validation"),
+    # MNLI has no single "validation" split -- "matched" = same domain as
+    # training, "mismatched" = different domain. We use matched here since
+    # it's the standard dev-set choice; switch to validation_mismatched if
+    # you specifically want the cross-domain variant.
+    "mnli": dict(hf_name="nyu-mll/glue", hf_config="mnli", text_cols=["premise", "hypothesis"], split="validation_matched"),
+    "conll2003": dict(hf_name="BramVanroy/conll2003", hf_config=None, text_cols=["tokens"], split="validation"),
 }
 
 
@@ -185,9 +189,9 @@ class LowRankCollapseHook:
 def load_task_texts(task_name: str, n_samples: int) -> list:
     cfg = TASKS[task_name]
     if cfg["hf_config"]:
-        ds = load_dataset(cfg["hf_name"], cfg["hf_config"], split="validation")
+        ds = load_dataset(cfg["hf_name"], cfg["hf_config"], split=cfg["split"])
     else:
-        ds = load_dataset(cfg["hf_name"], split="validation")
+        ds = load_dataset(cfg["hf_name"], split=cfg["split"])
     ds = ds.select(range(min(n_samples, len(ds))))
 
     texts = []
