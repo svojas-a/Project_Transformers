@@ -314,7 +314,9 @@ def run_experiment():
             intervened_avg = {
                 layer: {
                     m: float(
-                        np.nanmean([ex[layer][m] for ex in intervened_metrics_per_example])
+                        np.nanmean(
+                            [ex[layer][m] for ex in intervened_metrics_per_example]
+                        )
                     )
                     for m in [
                         "effective_rank",
