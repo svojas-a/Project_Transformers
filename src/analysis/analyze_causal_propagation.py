@@ -34,7 +34,6 @@ Outputs (written to results/analysis/):
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
 
@@ -53,6 +52,7 @@ def load_data(path: str = INPUT_CSV) -> pd.DataFrame:
 # --------------------------------------------------------------------------
 # 1. Decay curves: effect size vs distance, one line per source layer
 # --------------------------------------------------------------------------
+
 
 def plot_decay_curves(df: pd.DataFrame):
     """For each metric, plot mean abs_delta vs distance, one line per
@@ -76,7 +76,12 @@ def plot_decay_curves(df: pd.DataFrame):
                     .mean()
                     .sort_index()
                 )
-                ax.plot(line.index, line.values, marker="o", label=f"source layer {source_layer}")
+                ax.plot(
+                    line.index,
+                    line.values,
+                    marker="o",
+                    label=f"source layer {source_layer}",
+                )
             ax.set_xlabel("distance (downstream layers from source)")
             ax.set_title(title)
             ax.grid(alpha=0.3)
@@ -92,6 +97,7 @@ def plot_decay_curves(df: pd.DataFrame):
 # --------------------------------------------------------------------------
 # 2. Layer-3 hypothesis test (matched-distance, regression-controlled)
 # --------------------------------------------------------------------------
+
 
 def layer3_significance_test(df: pd.DataFrame) -> pd.DataFrame:
     """For each metric, restrict to distance == 1 (the one downstream
@@ -114,13 +120,15 @@ def layer3_significance_test(df: pd.DataFrame) -> pd.DataFrame:
         for layer in ["1", "2", "3", "4"]:
             param_name = f"C(source_layer, Treatment(reference='0'))[T.{layer}]"
             if param_name in model.params.index:
-                rows.append({
-                    "metric": metric,
-                    "source_layer": layer,
-                    "coef_vs_layer0": model.params[param_name],
-                    "p_value": model.pvalues[param_name],
-                    "significant_at_0.05": model.pvalues[param_name] < 0.05,
-                })
+                rows.append(
+                    {
+                        "metric": metric,
+                        "source_layer": layer,
+                        "coef_vs_layer0": model.params[param_name],
+                        "p_value": model.pvalues[param_name],
+                        "significant_at_0.05": model.pvalues[param_name] < 0.05,
+                    }
+                )
     result = pd.DataFrame(rows)
     result.to_csv(OUTPUT_DIR / "layer3_test_summary.csv", index=False)
     print("saved layer3_test_summary.csv")
@@ -133,6 +141,7 @@ def layer3_significance_test(df: pd.DataFrame) -> pd.DataFrame:
 #    favored over layer 4 with only 1)
 # --------------------------------------------------------------------------
 
+
 def mean_effect_per_downstream_layer(df: pd.DataFrame) -> pd.DataFrame:
     result = (
         df.groupby(["metric", "source_layer"])["abs_delta"]
@@ -140,7 +149,11 @@ def mean_effect_per_downstream_layer(df: pd.DataFrame) -> pd.DataFrame:
         .reset_index()
         .rename(columns={"abs_delta": "mean_abs_delta_per_downstream_layer"})
     )
-    pivot = result.pivot(index="source_layer", columns="metric", values="mean_abs_delta_per_downstream_layer")
+    pivot = result.pivot(
+        index="source_layer",
+        columns="metric",
+        values="mean_abs_delta_per_downstream_layer",
+    )
     pivot.to_csv(OUTPUT_DIR / "mean_effect_per_downstream_layer.csv")
     print("saved mean_effect_per_downstream_layer.csv")
     return pivot
@@ -151,6 +164,7 @@ def mean_effect_per_downstream_layer(df: pd.DataFrame) -> pd.DataFrame:
 #    rank, cosine similarity etc. -- which live on very different scales --
 #    can be combined into one comparable number per source layer)
 # --------------------------------------------------------------------------
+
 
 def composite_propagation_score(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -173,6 +187,7 @@ def composite_propagation_score(df: pd.DataFrame) -> pd.DataFrame:
 # Run everything
 # --------------------------------------------------------------------------
 
+
 def run_analysis(input_csv: str = INPUT_CSV):
     df = load_data(input_csv)
     print(f"Loaded {len(df)} rows from {input_csv}\n")
@@ -181,19 +196,25 @@ def run_analysis(input_csv: str = INPUT_CSV):
     print()
 
     layer3_results = layer3_significance_test(df)
-    print("\nLayer-3 significance test (positive coef = layer 3 causes MORE\n"
-          "downstream effect than layer 0 at the same distance, controlling\n"
-          "for task and rank):")
+    print(
+        "\nLayer-3 significance test (positive coef = layer 3 causes MORE\n"
+        "downstream effect than layer 0 at the same distance, controlling\n"
+        "for task and rank):"
+    )
     print(layer3_results[layer3_results["source_layer"] == "3"].to_string(index=False))
     print()
 
     per_layer = mean_effect_per_downstream_layer(df)
-    print("Mean effect per downstream layer (fair comparison, normalized\nby number of downstream layers each source layer has):")
+    print(
+        "Mean effect per downstream layer (fair comparison, normalized\nby number of downstream layers each source layer has):"
+    )
     print(per_layer.to_string())
     print()
 
     composite = composite_propagation_score(df)
-    print("Composite propagation score (higher = more causally disruptive\nsource layer, averaged across all 4 metrics, z-normalized):")
+    print(
+        "Composite propagation score (higher = more causally disruptive\nsource layer, averaged across all 4 metrics, z-normalized):"
+    )
     print(composite.to_string(index=False))
 
     return {

@@ -66,25 +66,41 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 N_LAYERS = 6
 SOURCE_LAYERS = [0, 1, 2, 3, 4, 5]
 TARGET_RANKS = [1, 2, 4, 8, 16, 32]
-N_SAMPLES_PER_TASK = 64       # keep modest; this is O(layers x ranks x tasks) forward passes
+N_SAMPLES_PER_TASK = 64  # keep modest; this is O(layers x ranks x tasks) forward passes
 MAX_LENGTH = 64
 OUTPUT_DIR = Path("results")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 TASKS = {
-    "sst2": dict(hf_name="nyu-mll/glue", hf_config="sst2", text_cols=["sentence"], split="validation"),
+    "sst2": dict(
+        hf_name="nyu-mll/glue",
+        hf_config="sst2",
+        text_cols=["sentence"],
+        split="validation",
+    ),
     # MNLI has no single "validation" split -- "matched" = same domain as
     # training, "mismatched" = different domain. We use matched here since
     # it's the standard dev-set choice; switch to validation_mismatched if
     # you specifically want the cross-domain variant.
-    "mnli": dict(hf_name="nyu-mll/glue", hf_config="mnli", text_cols=["premise", "hypothesis"], split="validation_matched"),
-    "conll2003": dict(hf_name="BramVanroy/conll2003", hf_config=None, text_cols=["tokens"], split="validation"),
+    "mnli": dict(
+        hf_name="nyu-mll/glue",
+        hf_config="mnli",
+        text_cols=["premise", "hypothesis"],
+        split="validation_matched",
+    ),
+    "conll2003": dict(
+        hf_name="BramVanroy/conll2003",
+        hf_config=None,
+        text_cols=["tokens"],
+        split="validation",
+    ),
 }
 
 
 # --------------------------------------------------------------------------
 # Metric functions (mirroring the baseline diagnostics stage so results are directly comparable)
 # --------------------------------------------------------------------------
+
 
 def effective_rank(hidden: torch.Tensor) -> float:
     """Entropy-based effective rank of the token representation matrix.
@@ -107,7 +123,7 @@ def stable_rank(hidden: torch.Tensor) -> float:
     s = np.linalg.svd(h, compute_uv=False)
     if s.max() < 1e-12:
         return float("nan")
-    return float(np.sum(s ** 2) / (s.max() ** 2))
+    return float(np.sum(s**2) / (s.max() ** 2))
 
 
 def mean_pairwise_cosine(hidden: torch.Tensor) -> float:
@@ -141,6 +157,7 @@ def compute_all_metrics(hidden_states: torch.Tensor, attentions: torch.Tensor) -
 # --------------------------------------------------------------------------
 # Intervention: forced low-rank collapse via SVD truncation
 # --------------------------------------------------------------------------
+
 
 class LowRankCollapseHook:
     """Forward hook that replaces a transformer layer's output hidden states
@@ -186,6 +203,7 @@ class LowRankCollapseHook:
 # Data loading (small fixed sample per task, consistent with the baseline diagnostics stage sizes)
 # --------------------------------------------------------------------------
 
+
 def load_task_texts(task_name: str, n_samples: int) -> list:
     cfg = TASKS[task_name]
     if cfg["hf_config"]:
@@ -209,24 +227,32 @@ def load_task_texts(task_name: str, n_samples: int) -> list:
 # Core experiment: one (task, source_layer, rank) cell
 # --------------------------------------------------------------------------
 
-def run_forward_collect_metrics(model, tokenizer, text: str, hook: LowRankCollapseHook = None,
-                                 collapse_active: bool = False) -> dict:
+
+def run_forward_collect_metrics(
+    model,
+    tokenizer,
+    text: str,
+    hook: LowRankCollapseHook = None,
+    collapse_active: bool = False,
+) -> dict:
     """Runs a single forward pass, returns {layer_idx: metrics_dict} for layers 0..5
     (layer_idx here means AFTER transformer layer idx, i.e. its output)."""
     if hook is not None:
         hook.active = collapse_active
 
-    enc = tokenizer(text, return_tensors="pt", truncation=True, max_length=MAX_LENGTH).to(DEVICE)
+    enc = tokenizer(
+        text, return_tensors="pt", truncation=True, max_length=MAX_LENGTH
+    ).to(DEVICE)
     with torch.no_grad():
         out = model(**enc, output_hidden_states=True, output_attentions=True)
 
     # out.hidden_states: tuple of (embedding, layer1_out, ..., layer6_out) -> len 7
     # out.attentions: tuple of length 6, each (batch, heads, seq, seq)
     per_layer = {}
-    for l in range(N_LAYERS):
-        hidden = out.hidden_states[l + 1][0]      # (seq_len, dim), skip batch dim
-        attn = out.attentions[l][0]               # (heads, seq_len, seq_len)
-        per_layer[l] = compute_all_metrics(hidden, attn)
+    for layer in range(N_LAYERS):
+        hidden = out.hidden_states[layer + 1][0]  # (seq_len, dim), skip batch dim
+        attn = out.attentions[layer][0]  # (heads, seq_len, seq_len)
+        per_layer[layer] = compute_all_metrics(hidden, attn)
 
     if hook is not None:
         hook.active = False
@@ -236,7 +262,9 @@ def run_forward_collect_metrics(model, tokenizer, text: str, hook: LowRankCollap
 def run_experiment():
     print(f"Device: {DEVICE}")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    model = DistilBertModel.from_pretrained(MODEL_NAME, attn_implementation="eager").to(DEVICE)
+    model = DistilBertModel.from_pretrained(MODEL_NAME, attn_implementation="eager").to(
+        DEVICE
+    )
     model.eval()
 
     records = []
@@ -254,49 +282,76 @@ def run_experiment():
             )
         # average clean metrics across examples, per layer
         clean_avg = {
-            l: {m: float(np.nanmean([ex[l][m] for ex in clean_metrics_per_example]))
-                for m in ["effective_rank", "stable_rank", "mean_pairwise_cosine", "attention_entropy"]}
-            for l in range(N_LAYERS)
+            layer: {
+                m: float(np.nanmean([ex[layer][m] for ex in clean_metrics_per_example]))
+                for m in [
+                    "effective_rank",
+                    "stable_rank",
+                    "mean_pairwise_cosine",
+                    "attention_entropy",
+                ]
+            }
+            for layer in range(N_LAYERS)
         }
         raw_store[(task_name, "clean")] = clean_avg
 
         # ---- intervened runs: for each source layer, each rank ----
         for source_layer, rank in itertools.product(SOURCE_LAYERS, TARGET_RANKS):
             hook_fn = LowRankCollapseHook(target_rank=rank)
-            handle = model.transformer.layer[source_layer].register_forward_hook(hook_fn)
+            handle = model.transformer.layer[source_layer].register_forward_hook(
+                hook_fn
+            )
 
             intervened_metrics_per_example = []
             for text in texts:
                 intervened_metrics_per_example.append(
-                    run_forward_collect_metrics(model, tokenizer, text, hook=hook_fn, collapse_active=True)
+                    run_forward_collect_metrics(
+                        model, tokenizer, text, hook=hook_fn, collapse_active=True
+                    )
                 )
             handle.remove()
 
             intervened_avg = {
-                l: {m: float(np.nanmean([ex[l][m] for ex in intervened_metrics_per_example]))
-                    for m in ["effective_rank", "stable_rank", "mean_pairwise_cosine", "attention_entropy"]}
-                for l in range(N_LAYERS)
+                layer: {
+                    m: float(
+                        np.nanmean([ex[layer][m] for ex in intervened_metrics_per_example])
+                    )
+                    for m in [
+                        "effective_rank",
+                        "stable_rank",
+                        "mean_pairwise_cosine",
+                        "attention_entropy",
+                    ]
+                }
+                for layer in range(N_LAYERS)
             }
             raw_store[(task_name, source_layer, rank)] = intervened_avg
 
             # record deltas for every downstream layer (l+1 ... 5)
             for downstream_layer in range(source_layer + 1, N_LAYERS):
                 distance = downstream_layer - source_layer
-                for metric_name in ["effective_rank", "stable_rank", "mean_pairwise_cosine", "attention_entropy"]:
+                for metric_name in [
+                    "effective_rank",
+                    "stable_rank",
+                    "mean_pairwise_cosine",
+                    "attention_entropy",
+                ]:
                     clean_val = clean_avg[downstream_layer][metric_name]
                     intervened_val = intervened_avg[downstream_layer][metric_name]
-                    records.append({
-                        "task": task_name,
-                        "source_layer": source_layer,
-                        "target_rank": rank,
-                        "downstream_layer": downstream_layer,
-                        "distance": distance,
-                        "metric": metric_name,
-                        "clean_value": clean_val,
-                        "intervened_value": intervened_val,
-                        "delta": intervened_val - clean_val,
-                        "abs_delta": abs(intervened_val - clean_val),
-                    })
+                    records.append(
+                        {
+                            "task": task_name,
+                            "source_layer": source_layer,
+                            "target_rank": rank,
+                            "downstream_layer": downstream_layer,
+                            "distance": distance,
+                            "metric": metric_name,
+                            "clean_value": clean_val,
+                            "intervened_value": intervened_val,
+                            "delta": intervened_val - clean_val,
+                            "abs_delta": abs(intervened_val - clean_val),
+                        }
+                    )
             print(f"  source_layer={source_layer}, rank={rank} done")
 
     df = pd.DataFrame.from_records(records)
