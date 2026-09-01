@@ -40,7 +40,7 @@ from transformers import AutoTokenizer, AutoModel
 # CONFIG - edit these per run
 # -----------------------------------------------------------------------
 MODEL_CHECKPOINT_PATH = "distilbert-base-uncased"  # swap for your fine-tuned SST-2/MNLI/CoNLL checkpoint
-TASK_NAME = "sst2"                                  # "sst2" | "mnli" | "conll2003"
+TASK_NAME = "sanity-check"                                  # "sst2" | "mnli" | "conll2003"
 TARGET_RANK = 32                                    # how low we force the intervened layer's rank
 NUM_LAYERS = 6                                       # DistilBERT has 6 transformer blocks
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
