@@ -12,6 +12,16 @@ Run this in Colab (needs GPU: Runtime -> Change runtime type -> GPU).
 
 import numpy as np
 from datasets import load_dataset
+import torch
+# -----------------------------------------------------------------------
+# DEVICE
+# -----------------------------------------------------------------------
+if torch.cuda.is_available():
+    DEVICE = torch.device("cuda")
+    print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+else:
+    DEVICE = torch.device("cpu")
+    print("CUDA not available. Using CPU.")
 from transformers import (
     AutoTokenizer,
     AutoModelForSequenceClassification,
@@ -25,7 +35,7 @@ import evaluate
 # CONFIG
 # -----------------------------------------------------------------------
 MODEL_NAME = "distilbert-base-uncased"
-SAVE_PATH = "/content/drive/MyDrive/Project_Transformers/checkpoints/sst2_finetuned"
+SAVE_PATH = "./checkpoints/sst2_finetuned"
 NUM_EPOCHS = 2          # SST-2 is small + DistilBERT converges fast; 2-3 is plenty
 BATCH_SIZE = 16
 LEARNING_RATE = 2e-5
@@ -74,7 +84,7 @@ def compute_metrics(eval_pred):
 # 4. TRAIN
 # -----------------------------------------------------------------------
 training_args = TrainingArguments(
-    output_dir="/content/sst2_training_output",
+    output_dir="./sst2_training_output",
     eval_strategy="epoch",
     save_strategy="epoch",
     learning_rate=LEARNING_RATE,
@@ -92,7 +102,7 @@ trainer = Trainer(
     args=training_args,
     train_dataset=tokenized["train"],
     eval_dataset=tokenized["validation"],
-    processing_class=tokenizer,
+    tokenizer=tokenizer,
     data_collator=data_collator,
     compute_metrics=compute_metrics,
 )
