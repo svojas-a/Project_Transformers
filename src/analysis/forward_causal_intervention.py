@@ -85,7 +85,7 @@ from datasets import load_dataset
 # -----------------------------------------------------------------------
 # CONFIG - edit these per run
 # -----------------------------------------------------------------------
-MODEL_CHECKPOINT_PATH = "/content/drive/MyDrive/Project_Transformers/checkpoints/sst2_finetuned"
+MODEL_CHECKPOINT_PATH = "./checkpoints/sst2_finetuned"
 TASK_NAME = "sst2"                                  # "sst2" | "mnli" | "conll2003"
 IS_CLASSIFICATION_CHECKPOINT = True                 # True for fine-tuned checkpoints saved via
                                                      # AutoModelForSequenceClassification (e.g. finetune_sst2.py output)
