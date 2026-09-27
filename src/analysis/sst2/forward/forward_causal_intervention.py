@@ -20,7 +20,7 @@ import json
 from pathlib import Path
 import numpy as np
 
-from common import (
+from ..common import (
     TASK_NAME,
     RANK_FRACTION,
     MIN_RANK,

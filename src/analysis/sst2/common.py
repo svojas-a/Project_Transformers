@@ -24,8 +24,8 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 # CONFIG
 # ---------------------------------------------------------------------
 TASK_NAME = "sst2"
-MODEL_CHECKPOINT_PATH = (
-    Path(__file__).resolve().parent / "checkpoints" / "sst2_finetuned"
+MODEL_CHECKPOINT_PATH = Path(
+    "/content/drive/MyDrive/Project_Transformers/checkpoints/sst2_finetuned"
 )
 
 N_LAYERS = 6

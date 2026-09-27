@@ -1,0 +1,17 @@
+[
+  {
+    "metric": "effective_rank",
+    "common_top_layers": [],
+    "convergence_candidate": 0
+  },
+  {
+    "metric": "stable_rank",
+    "common_top_layers": [],
+    "convergence_candidate": 2
+  },
+  {
+    "metric": "mean_cosine_sim",
+    "common_top_layers": [],
+    "convergence_candidate": 0
+  }
+]

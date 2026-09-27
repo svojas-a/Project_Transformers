@@ -27,7 +27,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
+
 FWD_DIR = ROOT / "forward" / "fwd_results"
 BWD_DIR = ROOT / "backward" / "bwd_results"
 OUT_DIR = ROOT / "convergence" / "convergence_results"
